@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { EVENTS } from "../../../config/events";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-06-20"
@@ -16,17 +17,25 @@ export default async function handler(req, res) {
     const { slug } = req.body || {};
     const eventSlug = slug || "test-event";
 
-    // For now: hard-coded $10 test ticket
+    const event = EVENTS[eventSlug];
+
+    if (!event) {
+      return res
+        .status(400)
+        .json({ ok: false, error: `Unknown event slug: ${eventSlug}` });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
       line_items: [
         {
           price_data: {
-            currency: "usd",
-            unit_amount: 1000, // $10.00 in cents
+            currency: event.currency,
+            unit_amount: event.priceCents,
             product_data: {
-              name: `Test ticket for ${eventSlug}`
+              name: event.name,
+              description: event.description
             }
           },
           quantity: 1
