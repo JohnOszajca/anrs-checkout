@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { EVENTS } from "../../config/events";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -10,6 +11,11 @@ export default function CheckoutPage() {
 
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+
+  const event = useMemo(() => {
+    if (!slug) return null;
+    return EVENTS[slug] || null;
+  }, [slug]);
 
   // Old test button: calls /api/stripe-test
   async function handleTestPayment() {
@@ -39,7 +45,6 @@ export default function CheckoutPage() {
 
       const data = await res.json();
       if (data.ok && data.url) {
-        // Send the user to Stripe's hosted checkout page
         window.location.href = data.url;
       } else {
         setCheckoutError(
@@ -53,26 +58,45 @@ export default function CheckoutPage() {
     }
   }
 
+  const eventTitle = event?.name || (slug ? `Checkout – ${slug}` : "Loading...");
+  const priceDisplay =
+    typeof event?.priceCents === "number"
+      ? (event.priceCents / 100).toFixed(2)
+      : null;
+  const currency = event?.currency?.toUpperCase() || "USD";
+
   return (
     <main style={{ fontFamily: "sans-serif", padding: "2rem" }}>
-      <h1>Checkout – {slug || "Loading..."}</h1>
-      <p>
-        This page will eventually sell tickets for a specific event (like
-        Franklin, Maryville, etc).
-      </p>
+      <h1>{eventTitle}</h1>
+
+      {event ? (
+        <>
+          <p>{event.description}</p>
+          {priceDisplay && (
+            <p>
+              Ticket price: <strong>{priceDisplay} {currency}</strong>
+            </p>
+          )}
+        </>
+      ) : (
+        <p>
+          {slug
+            ? "Unknown event slug. This page might not be configured yet."
+            : "Loading event..."}
+        </p>
+      )}
 
       <hr style={{ margin: "2rem 0" }} />
 
       <h2>Test Checkout Flow</h2>
       <p>
-        This button will create a <strong>test</strong> $10 ticket session and
-        redirect you to Stripe&apos;s hosted payment page (no real money in
-        test mode).
+        This button will create a <strong>test</strong> ticket session for this event
+        and redirect you to Stripe&apos;s hosted payment page (test mode only).
       </p>
 
       <button
         onClick={handleStartCheckout}
-        disabled={checkoutLoading}
+        disabled={checkoutLoading || !event}
         style={{
           padding: "0.75rem 1.5rem",
           fontSize: "1rem",
@@ -80,7 +104,7 @@ export default function CheckoutPage() {
           marginBottom: "0.75rem"
         }}
       >
-        {checkoutLoading ? "Starting checkout..." : "Start test checkout ($10)"}
+        {checkoutLoading ? "Starting checkout..." : "Start test checkout"}
       </button>
 
       {checkoutError && (
